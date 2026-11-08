@@ -271,9 +271,9 @@ If you use this code or methodology, please cite:
 ```bibtex
 @misc{mulenet2026,
   title  = {MuleNet AI: Graph-based Money-Mule Detection},
-  author = {<Your Name>},
+  author = {Mandeep Singh},
   year   = {2026},
-  url    = {https://github.com/<your-username>/mulenet-ai}
+  url    = {https://github.com/Mandeep15686/MuleNet-AI}
 }
 ```
 
