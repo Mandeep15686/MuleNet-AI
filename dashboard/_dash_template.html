@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MuleNet AI — Investigation Dashboard v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--border:#2a2d3e;
+  --accent:#6366f1;--accent2:#22d3ee;--danger:#ef4444;
+  --warn:#f59e0b;--text:#e2e8f0;--muted:#64748b;--card:#1e2130;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;overflow:hidden}
+#app{display:grid;grid-template-rows:52px auto 1fr;height:100vh}
+
+/* ── header ── */
+header{background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 16px;gap:12px;z-index:10}
+header h1{font-size:15px;font-weight:700;white-space:nowrap}
+.tag{background:var(--accent);color:#fff;font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:20px;white-space:nowrap}
+#search-wrap{flex:1;max-width:380px;margin-left:auto;position:relative}
+#search{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:6px 12px 6px 32px;border-radius:8px;font-size:13px;outline:none;transition:border-color .15s}
+#search:focus{border-color:var(--accent)}
+#search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+#search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;overflow:hidden;z-index:200;display:none;
+  box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.sr-item{padding:8px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)}
+.sr-item:hover{background:rgba(99,102,241,.12)}
+.sr-item:last-child{border-bottom:none}
+.sr-label{font-size:10px;color:var(--muted);margin-top:2px}
+
+/* ── KPI bar ── */
+#kpi-bar{display:flex;background:var(--surface);border-bottom:1px solid var(--border)}
+.kpi{flex:1;padding:8px 16px;border-right:1px solid var(--border)}
+.kpi:last-child{border-right:none}
+.kv{font-size:19px;font-weight:800;color:var(--accent)}
+.kl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+
+/* ── main grid ── */
+main{display:grid;grid-template-columns:300px 1fr 320px;overflow:hidden}
+
+/* ── left panel ── */
+#left{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border)}
+.tab{flex:1;padding:8px;font-size:11px;font-weight:700;text-align:center;cursor:pointer;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.6px;
+  border-bottom:2px solid transparent;transition:color .15s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-panel{display:none;flex:1;overflow-y:auto}
+.tab-panel.active{display:flex;flex-direction:column}
+
+.filter-bar{padding:7px 10px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:5px}
+.filter-bar select{background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:3px 6px;border-radius:5px;font-size:11px;flex:1}
+.ring-row{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;
+  transition:background .12s;border-left:3px solid transparent}
+.ring-row:hover{background:rgba(99,102,241,.07)}
+.ring-row.active{background:rgba(99,102,241,.14);border-left-color:var(--accent)}
+.rh{display:flex;justify-content:space-between;margin-bottom:3px}
+.rt{font-weight:600;font-size:12px}
+.rs{font-weight:700;font-size:12px;color:var(--accent)}
+.rm{display:flex;gap:7px;font-size:11px;color:var(--muted);flex-wrap:wrap;margin-top:2px}
+.badge{padding:1px 5px;border-radius:8px;font-size:10px;font-weight:700}
+.badge-LAYERING_RING{background:rgba(239,68,68,.2);color:#fca5a5}
+.badge-FAN_OUT_HUB{background:rgba(245,158,11,.2);color:#fcd34d}
+.badge-RAPID_TRANSFER_CHAIN{background:rgba(34,211,238,.2);color:#67e8f9}
+.badge-MIXED{background:rgba(100,116,139,.2);color:#94a3b8}
+
+/* ── analytics panel ── */
+#analytics-panel{padding:14px;display:flex;flex-direction:column;gap:16px}
+.chart-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.7px;margin-bottom:8px}
+
+/* ── center graph ── */
+#graph-pane{display:flex;flex-direction:column;overflow:hidden}
+#graph-toolbar{display:flex;align-items:center;gap:7px;padding:7px 12px;
+  background:var(--surface);border-bottom:1px solid var(--border)}
+#graph-title{font-size:12px;font-weight:600;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-btn{background:var(--bg);border:1px solid var(--border);color:var(--muted);
+  padding:3px 9px;border-radius:5px;font-size:11px;cursor:pointer;transition:all .12s}
+.tb-btn:hover{border-color:var(--accent);color:var(--text)}
+#graph-container{flex:1;position:relative;overflow:hidden;background:var(--bg)}
+#graph-svg{width:100%;height:100%}
+#graph-ph{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:var(--muted);font-size:13px;pointer-events:none}
+.glegend{position:absolute;bottom:12px;left:12px;background:rgba(15,17,23,.88);
+  border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px}
+.li{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.li:last-child{margin-bottom:0}
+.ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* ── right panel ── */
+#right{display:flex;flex-direction:column;border-left:1px solid var(--border);overflow:hidden}
+.rpanel{display:none;flex:1;overflow-y:auto;flex-direction:column}
+.rpanel.active{display:flex}
+#dossier-inner{padding:14px}
+#timeline-inner{min-height:100px}
+.dtitle{font-size:13px;font-weight:700;color:var(--accent2);margin-bottom:8px}
+.did{font-size:11px;color:var(--muted);margin-bottom:10px;word-break:break-all}
+.sbar{height:5px;background:var(--border);border-radius:3px;margin-bottom:12px}
+.sfill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.stitle{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.7px;margin:12px 0 6px}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.sc{background:var(--bg);border-radius:6px;padding:6px 9px}
+.sv{font-size:13px;font-weight:700}
+.sl{font-size:10px;color:var(--muted);margin-top:1px}
+.rtag{display:inline-block;background:rgba(99,102,241,.15);color:#a5b4fc;
+  border:1px solid rgba(99,102,241,.3);padding:2px 7px;border-radius:5px;
+  font-size:10px;margin:2px 2px 2px 0}
+.wbox{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);
+  color:#fcd34d;padding:5px 9px;border-radius:6px;font-size:11px;margin-bottom:10px}
+.mi{display:flex;justify-content:space-between;align-items:center;
+  padding:5px 8px;border-radius:5px;cursor:pointer;margin-bottom:2px;
+  background:var(--bg);transition:background .12s}
+.mi:hover{background:rgba(99,102,241,.1)}
+.mi.confirmed{border-left:3px solid var(--danger)}
+.mi.flagged{border-left:3px solid var(--warn)}
+.mname{font-size:11px;font-family:monospace;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:170px}
+.mscore{font-size:11px;font-weight:700;color:var(--accent);flex-shrink:0}
+
+/* ── fullscreen modal ── */
+#modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:1000;
+  flex-direction:column;padding:20px}
+#modal.open{display:flex}
+#mhdr{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+#mtitle{font-size:16px;font-weight:700;flex:1}
+#mclose{background:var(--surface);border:1px solid var(--border);color:var(--text);
+  padding:5px 14px;border-radius:6px;cursor:pointer;font-size:13px}
+#mbody{flex:1;display:grid;grid-template-columns:1fr 340px;gap:12px;overflow:hidden}
+#mgraph{background:var(--bg);border-radius:8px;overflow:hidden;position:relative}
+#mgsvg{width:100%;height:100%}
+#mright{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+#mtl{background:var(--card);border-radius:8px;padding:14px;flex-shrink:0}
+#mmem{background:var(--card);border-radius:8px;padding:14px;flex:1;overflow-y:auto;min-height:100px}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <h1>&#x1F575;&#xFE0F; MuleNet AI</h1>
+  <span class="tag">INVESTIGATION DASHBOARD v2</span>
+  <div id="search-wrap">
+    <span id="search-icon">&#x1F50D;</span>
+    <input id="search" type="text" placeholder="Search account ID&hellip;" autocomplete="off">
+    <div id="search-results"></div>
+  </div>
+</header>
+
+<div id="kpi-bar">
+  <div class="kpi"><div class="kv" id="k-fl">&mdash;</div><div class="kl">Flagged Accounts</div></div>
+  <div class="kpi"><div class="kv" id="k-ri">&mdash;</div><div class="kl">Rings Found</div></div>
+  <div class="kpi"><div class="kv" id="k-ir">&mdash;</div><div class="kl">In Rings</div></div>
+  <div class="kpi"><div class="kv" id="k-cm">&mdash;</div><div class="kl">Confirmed Mules</div></div>
+  <div class="kpi"><div class="kv" id="k-fw">&mdash;</div><div class="kl">Top-10 Ring Flow</div></div>
+</div>
+
+<main>
+
+  <!-- LEFT -->
+  <div id="left">
+    <div class="tabs">
+      <div class="tab active" data-tab="rings">Rings</div>
+      <div class="tab" data-tab="analytics">Analytics</div>
+    </div>
+    <div class="tab-panel active" id="tab-rings">
+      <div class="filter-bar">
+        <select id="ft">
+          <option value="">All typologies</option>
+          <option>LAYERING_RING</option><option>FAN_OUT_HUB</option>
+          <option>RAPID_TRANSFER_CHAIN</option><option>MIXED</option>
+        </select>
+        <select id="fs">
+          <option value="ring_score">Score</option>
+          <option value="n_flagged">Flagged</option>
+          <option value="flag_density">Density</option>
+          <option value="total_flow">Flow</option>
+        </select>
+      </div>
+      <div id="ring-list"></div>
+    </div>
+    <div class="tab-panel" id="tab-analytics">
+      <div id="analytics-panel">
+        <div>
+          <div class="chart-title">Typology Breakdown</div>
+          <svg id="donut-svg" height="160" style="width:100%;display:block"></svg>
+        </div>
+        <div>
+          <div class="chart-title">Risk Score Distribution</div>
+          <svg id="hist-svg" height="130" style="width:100%;display:block"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER -->
+  <div id="graph-pane">
+    <div id="graph-toolbar">
+      <span id="graph-title" style="color:var(--muted)">Select a ring to visualise</span>
+      <button class="tb-btn" id="btn-zi">&#xFF0B;</button>
+      <button class="tb-btn" id="btn-zo">&#xFF0D;</button>
+      <button class="tb-btn" id="btn-zf">Fit</button>
+      <button class="tb-btn" id="btn-exp" style="display:none">&#x26F6; Full</button>
+    </div>
+    <div id="graph-container">
+      <svg id="graph-svg"></svg>
+      <div id="graph-ph">&larr; Select a ring</div>
+      <div class="glegend" id="gleg" style="display:none">
+        <div class="li"><div class="ld" style="background:#ef4444;border:2px solid #fca5a5"></div>Confirmed mule</div>
+        <div class="li"><div class="ld" style="background:#f59e0b;border:2px solid #fcd34d"></div>Flagged account</div>
+        <div class="li"><div class="ld" style="background:#334155;border:2px solid #475569"></div>1-hop neighbour</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div id="right">
+    <div class="tabs">
+      <div class="tab active" data-tab="dossier" id="rt-dos">Dossier</div>
+      <div class="tab" data-tab="timeline" id="rt-tl">Timeline</div>
+    </div>
+    <div class="rpanel active" id="tab-dossier">
+      <div id="dossier-inner">
+        <div style="padding:40px 16px;text-align:center;color:var(--muted);font-size:12px">
+          Select a ring or account
+        </div>
+      </div>
+    </div>
+    <div class="rpanel" id="tab-timeline">
+      <div id="timeline-inner">
+        <div style="padding:40px 16px;text-align:center;color:var(--muted);font-size:12px">
+          Select a ring to see evidence timeline
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- FULLSCREEN MODAL -->
+<div id="modal">
+  <div id="mhdr">
+    <span id="mtitle">Ring Detail</span>
+    <button id="mclose">&#x2715; Close</button>
+  </div>
+  <div id="mbody">
+    <div id="mgraph">
+      <svg id="mgsvg"></svg>
+      <div class="glegend" id="mgleg" style="display:none">
+        <div class="li"><div class="ld" style="background:#ef4444;border:2px solid #fca5a5"></div>Confirmed mule</div>
+        <div class="li"><div class="ld" style="background:#f59e0b;border:2px solid #fcd34d"></div>Flagged account</div>
+        <div class="li"><div class="ld" style="background:#334155;border:2px solid #475569"></div>1-hop neighbour</div>
+      </div>
+    </div>
+    <div id="mright">
+      <div id="mtl"><div class="chart-title">Evidence Timeline</div><div id="mtl-inner"></div></div>
+      <div id="mmem"><div class="chart-title">Flagged Members</div><div id="mmem-list"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data injected by builder ──────────────────────────────────────────────────
+const RINGS   = __RINGS__;
+const MEMBERS = __MEMBERS__;
+const EDGES   = __EDGES__;
+const DOS     = __DOS__;
+const EV      = __EV__;
+const STATS   = __STATS__;
+
+// ── Indexes ───────────────────────────────────────────────────────────────────
+const dosMap = Object.fromEntries(DOS.map(d => [d.account_id, d]));
+const memByRing = {}, edgeByCid = {}, evByAcc = {};
+MEMBERS.forEach(m => { (memByRing[m.ring_id] = memByRing[m.ring_id] || []).push(m); });
+EDGES.forEach(e   => { (edgeByCid[e.community_id] = edgeByCid[e.community_id] || []).push(e); });
+EV.forEach(e      => { (evByAcc[e.account_id]     = evByAcc[e.account_id]     || []).push(e); });
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fv(v) {
+  if (!v || isNaN(v)) return '$0';
+  if (v >= 1e9) return '$' + (v/1e9).toFixed(1) + 'B';
+  if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+  if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
+  return '$' + v.toFixed(0);
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────────────────
+document.getElementById('k-fl').textContent = STATS.total_flagged.toLocaleString();
+document.getElementById('k-ri').textContent = STATS.total_rings.toLocaleString();
+document.getElementById('k-ir').textContent = STATS.accounts_in_rings.toLocaleString();
+document.getElementById('k-cm').textContent = STATS.confirmed_mules.toLocaleString();
+document.getElementById('k-fw').textContent = fv(STATS.total_flow_top10);
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function initTabs(root, tsel, pref) {
+  root.querySelectorAll(tsel).forEach(t => {
+    t.addEventListener('click', () => {
+      root.querySelectorAll(tsel).forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.querySelectorAll('[id^="' + pref + '"]').forEach(p => p.classList.remove('active'));
+      const p = document.getElementById(pref + t.dataset.tab);
+      if (p) p.classList.add('active');
+    });
+  });
+}
+initTabs(document.getElementById('left'),  '.tab', 'tab-');
+initTabs(document.getElementById('right'), '.tab', 'tab-');
+
+// ── Ring List ─────────────────────────────────────────────────────────────────
+let activeId = null;
+function renderList() {
+  const typ = document.getElementById('ft').value;
+  const sk  = document.getElementById('fs').value;
+  let data = RINGS.slice();
+  if (typ) data = data.filter(r => r.typology === typ);
+  data.sort((a, b) => b[sk] - a[sk]);
+  const ul = document.getElementById('ring-list');
+  ul.innerHTML = '';
+  data.forEach(r => {
+    const dc = r.flag_density > 0.3 ? 'var(--danger)' : r.flag_density > 0.05 ? 'var(--warn)' : 'var(--muted)';
+    const el = document.createElement('div');
+    el.className = 'ring-row' + (r.ring_id === activeId ? ' active' : '');
+    el.innerHTML =
+      '<div class="rh"><span class="rt">Ring #' + r.ring_rank + '</span><span class="rs">' + r.ring_score.toFixed(4) + '</span></div>' +
+      '<div class="rm"><span class="badge badge-' + r.typology + '">' + r.typology.replace(/_/g, ' ') + '</span>' +
+      '<span>' + r.n_flagged + ' flagged / ' + r.ring_size + ' nodes</span>' +
+      '<span style="color:' + dc + '">' + (r.flag_density * 100).toFixed(1) + '% density</span></div>' +
+      '<div class="rm"><span>Flow: ' + fv(r.total_flow) + '</span>' +
+      (r.n_confirmed_mules > 0 ? '<span style="color:var(--danger)">&#9888; ' + r.n_confirmed_mules + ' confirmed</span>' : '') + '</div>';
+    el.addEventListener('click', () => selectRing(r.ring_id));
+    ul.appendChild(el);
+  });
+}
+document.getElementById('ft').addEventListener('change', renderList);
+document.getElementById('fs').addEventListener('change', renderList);
+renderList();
+
+// ── Analytics ─────────────────────────────────────────────────────────────────
+(function() {
+  // Donut
+  const tc = STATS.typology_counts;
+  const entries = Object.entries(tc).sort((a, b) => b[1] - a[1]);
+  const clrs = { LAYERING_RING:'#ef4444', FAN_OUT_HUB:'#f59e0b', RAPID_TRANSFER_CHAIN:'#22d3ee', MIXED:'#6366f1' };
+  const total = Object.values(tc).reduce((a, b) => a + b, 0);
+  const W = 260, H = 160, R = 52, cx = 95, cy = H / 2;
+  const pie = d3.pie().value(d => d[1])(entries);
+  const arc = d3.arc().innerRadius(R * .62).outerRadius(R);
+  const svg = d3.select('#donut-svg').attr('viewBox', '0 0 ' + W + ' ' + H);
+  svg.append('g').attr('transform', 'translate(' + cx + ',' + cy + ')')
+    .selectAll('path').data(pie).enter().append('path')
+    .attr('d', arc).attr('fill', d => clrs[d.data[0]] || '#475569')
+    .attr('stroke', 'var(--bg)').attr('stroke-width', 2);
+  svg.append('text').attr('x', cx).attr('y', cy + 5).attr('text-anchor', 'middle')
+    .attr('font-size', 15).attr('font-weight', 700).attr('fill', 'var(--text)').text(total);
+  svg.append('text').attr('x', cx).attr('y', cy + 19).attr('text-anchor', 'middle')
+    .attr('font-size', 9).attr('fill', 'var(--muted)').text('rings');
+  entries.forEach(([typ, cnt], i) => {
+    const g = svg.append('g').attr('transform', 'translate(' + (cx + R + 10) + ',' + (cy - entries.length * 11 + i * 22) + ')');
+    g.append('rect').attr('width', 8).attr('height', 8).attr('rx', 2).attr('y', -6).attr('fill', clrs[typ] || '#475569');
+    g.append('text').attr('x', 12).attr('font-size', 9.5).attr('fill', 'var(--muted)').attr('dominant-baseline', 'middle')
+      .text(typ.replace(/_/g, ' ') + ' (' + cnt + ')');
+  });
+
+  // Histogram
+  const bk = STATS.score_buckets;
+  if (!bk || !bk.length) return;
+  const HW = 260, HH = 130, mt = 8, mb = 28, ml = 34, mr = 6;
+  const iW = HW - ml - mr, iH = HH - mt - mb;
+  const maxC = Math.max(...bk.map(b => b.count));
+  const xS = d3.scaleLinear().domain([0, 1]).range([0, iW]);
+  const yS = d3.scaleLinear().domain([0, maxC]).range([iH, 0]);
+  const hs = d3.select('#hist-svg').attr('viewBox', '0 0 ' + HW + ' ' + HH);
+  const hg = hs.append('g').attr('transform', 'translate(' + ml + ',' + mt + ')');
+  const grd = hs.append('defs').append('linearGradient').attr('id', 'hgrad').attr('x2', 1).attr('y2', 0);
+  grd.append('stop').attr('offset', '0%').attr('stop-color', '#6366f1');
+  grd.append('stop').attr('offset', '100%').attr('stop-color', '#22d3ee');
+  hg.selectAll('rect').data(bk).enter().append('rect')
+    .attr('x', d => xS(d.lo) + 1).attr('width', d => Math.max(0, xS(d.hi) - xS(d.lo) - 2))
+    .attr('y', d => yS(d.count)).attr('height', d => iH - yS(d.count))
+    .attr('fill', 'url(#hgrad)').attr('rx', 2);
+  hg.append('g').attr('transform', 'translate(0,' + iH + ')')
+    .call(d3.axisBottom(xS).ticks(5).tickSize(2))
+    .selectAll('text').attr('fill', 'var(--muted)').attr('font-size', 9);
+  hg.append('g').call(d3.axisLeft(yS).ticks(4).tickSize(2))
+    .selectAll('text').attr('fill', 'var(--muted)').attr('font-size', 9);
+  hg.selectAll('.domain,.tick line').attr('stroke', 'var(--border)');
+})();
+
+// ── Graph ─────────────────────────────────────────────────────────────────────
+let curRing = null, zB = null, simRef = null;
+
+function selectRing(rid) {
+  activeId = rid;
+  renderList();
+  curRing = RINGS.find(r => r.ring_id === rid);
+  if (!curRing) return;
+  document.getElementById('graph-title').textContent =
+    'Ring #' + curRing.ring_rank + ' \xB7 ' + curRing.typology + ' \xB7 ' + curRing.ring_size + ' nodes \xB7 ' + curRing.n_flagged + ' flagged';
+  document.getElementById('btn-exp').style.display = '';
+  const mems = memByRing[rid] || [];
+  const eds  = edgeByCid[curRing.community_id] || [];
+  if (eds.length > 0) {
+    drawGraph(mems, eds, 'graph-svg', false);
+    document.getElementById('graph-ph').style.display = 'none';
+    document.getElementById('gleg').style.display = 'block';
+  } else {
+    document.getElementById('graph-svg').innerHTML = '';
+    document.getElementById('graph-ph').style.display = 'flex';
+    document.getElementById('graph-ph').textContent = 'No edge data for this ring.';
+    document.getElementById('gleg').style.display = 'none';
+  }
+  showRingDossier(curRing, mems);
+  drawTL(mems, 'timeline-inner');
+}
+
+function drawGraph(members, edgeData, svgId, large) {
+  const svgEl = document.getElementById(svgId);
+  svgEl.innerHTML = '';
+  const fS = new Set(members.filter(m => m.is_flagged).map(m => m.account_id));
+  const cS = new Set(members.filter(m => m.label === 1).map(m => m.account_id));
+  const sM = Object.fromEntries(members.map(m => [m.account_id, m.risk_score || 0]));
+  const ns  = new Set(); edgeData.forEach(e => { ns.add(e.src_id); ns.add(e.dst_id); });
+  const nodes = [...ns].map(id => ({ id, flagged: fS.has(id), confirmed: cS.has(id), score: sM[id] || 0 }));
+  const mx    = Math.max(...edgeData.map(e => e.total_amount || 1));
+  const links = edgeData.map(e => ({ source: e.src_id, target: e.dst_id,
+    value: e.total_amount || 1, w: 1 + 3 * Math.sqrt((e.total_amount || 1) / mx) }));
+  const W = svgEl.clientWidth || 700, H = svgEl.clientHeight || 500;
+  const cx = W / 2, cy = H / 2;
+  const IS_LARGE = nodes.length > 150;
+
+  const svg = d3.select('#' + svgId);
+  svg.append('defs').append('marker').attr('id', 'arr_' + svgId)
+    .attr('viewBox', '0 -4 8 8').attr('refX', 14).attr('markerWidth', 5).attr('markerHeight', 5).attr('orient', 'auto')
+    .append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', '#475569');
+  const g = svg.append('g');
+  zB = d3.zoom().scaleExtent([.02, 12]).on('zoom', e => g.attr('transform', e.transform));
+  svg.call(zB);
+
+  if (IS_LARGE) {
+    // ── Circular layout for large rings ──────────────────────────────────────
+    // Flagged on inner ring, neighbours on outer rings
+    const flaggedNodes = nodes.filter(d => d.flagged);
+    const outerNodes   = nodes.filter(d => !d.flagged);
+    const rInner = Math.min(cx, cy) * 0.28;
+    const rOuter = Math.min(cx, cy) * 0.82;
+
+    // Position flagged nodes on inner circle
+    flaggedNodes.forEach((d, i) => {
+      const a = (2 * Math.PI * i) / Math.max(flaggedNodes.length, 1) - Math.PI / 2;
+      d.x = cx + rInner * Math.cos(a);
+      d.y = cy + rInner * Math.sin(a);
+    });
+
+    // Position outer nodes on one or more concentric rings
+    const outerPerRing = Math.ceil(Math.sqrt(outerNodes.length) * 2.5);
+    outerNodes.forEach((d, i) => {
+      const ring  = Math.floor(i / outerPerRing);
+      const posInRing = i % outerPerRing;
+      const countInRing = Math.min(outerPerRing, outerNodes.length - ring * outerPerRing);
+      const r = rOuter + ring * 55;
+      const a = (2 * Math.PI * posInRing) / countInRing - Math.PI / 2;
+      d.x = cx + r * Math.cos(a);
+      d.y = cy + r * Math.sin(a);
+    });
+
+    // Build position map
+    const posMap = Object.fromEntries(nodes.map(d => [d.id, { x: d.x, y: d.y }]));
+
+    // Draw edges (straight, low opacity for large rings)
+    const edgeLimit = Math.min(links.length, 3000);
+    const topLinks = links.slice().sort((a, b) => b.value - a.value).slice(0, edgeLimit);
+    g.append('g').selectAll('line').data(topLinks).enter().append('line')
+      .attr('x1', d => (posMap[d.source] || posMap[d.source.id] || {x:cx}).x)
+      .attr('y1', d => (posMap[d.source] || posMap[d.source.id] || {y:cy}).y)
+      .attr('x2', d => (posMap[d.target] || posMap[d.target.id] || {x:cx}).x)
+      .attr('y2', d => (posMap[d.target] || posMap[d.target.id] || {y:cy}).y)
+      .attr('stroke', '#1e3a5f').attr('stroke-width', d => Math.min(d.w, 2)).attr('opacity', .4);
+
+    // Draw nodes
+    const nG = g.append('g').selectAll('g').data(nodes).enter().append('g')
+      .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')')
+      .attr('cursor', 'pointer');
+    nG.append('circle')
+      .attr('r',      d => d.confirmed ? 9 : d.flagged ? 7 : 3)
+      .attr('fill',   d => d.confirmed ? '#ef4444' : d.flagged ? '#f59e0b' : '#1e3a5f')
+      .attr('stroke', d => d.confirmed ? '#fca5a5' : d.flagged ? '#fcd34d' : 'none')
+      .attr('stroke-width', 1.5);
+    nG.filter(d => d.flagged).append('text')
+      .attr('dy', -11).attr('text-anchor', 'middle').attr('font-size', 8)
+      .attr('fill', d => d.confirmed ? '#fca5a5' : '#fcd34d')
+      .text(d => d.id.split('_').pop().slice(-8));
+    nG.append('title').text(d =>
+      d.id + '\nScore: ' + d.score.toFixed(4) + '\n' + (d.confirmed ? '\u26A0 Confirmed' : d.flagged ? 'Flagged' : 'Neighbour'));
+    nG.on('click', (ev, d) => { ev.stopPropagation(); showAccountDossier(d.id); });
+
+    // Size label
+    svg.append('text').attr('x', 10).attr('y', 20).attr('font-size', 10).attr('fill', 'var(--muted)')
+      .text(nodes.length + ' nodes \xB7 ' + edgeLimit + (links.length > edgeLimit ? '/' + links.length : '') + ' edges shown \xB7 circular layout');
+
+  } else {
+    // ── Force layout for small/medium rings ──────────────────────────────────
+    const link = g.append('g').selectAll('path').data(links).enter().append('path')
+      .attr('fill', 'none').attr('stroke', '#334155')
+      .attr('stroke-width', d => d.w).attr('opacity', .75)
+      .attr('marker-end', 'url(#arr_' + svgId + ')');
+
+    const nG = g.append('g').selectAll('g').data(nodes).enter().append('g').attr('cursor', 'pointer');
+    nG.append('circle')
+      .attr('r',      d => d.confirmed ? 10 : d.flagged ? 8 : 5)
+      .attr('fill',   d => d.confirmed ? '#ef4444' : d.flagged ? '#f59e0b' : '#1e293b')
+      .attr('stroke', d => d.confirmed ? '#fca5a5' : d.flagged ? '#fcd34d' : '#475569')
+      .attr('stroke-width', d => d.flagged ? 2 : 1);
+    nG.filter(d => d.flagged).append('text')
+      .attr('dy', -13).attr('text-anchor', 'middle').attr('font-size', 9)
+      .attr('fill', d => d.confirmed ? '#fca5a5' : '#fcd34d')
+      .text(d => d.id.split('_').pop().slice(-8));
+    nG.append('title').text(d =>
+      d.id + '\nScore: ' + d.score.toFixed(4) + '\n' + (d.confirmed ? '\u26A0 Confirmed mule' : d.flagged ? 'Flagged' : 'Neighbour'));
+    nG.on('click', (ev, d) => { ev.stopPropagation(); showAccountDossier(d.id); });
+
+    function arcPath(d) {
+      if (!d.source.x) return '';
+      const dx = d.target.x - d.source.x, dy = d.target.y - d.source.y;
+      const dr = Math.sqrt(dx * dx + dy * dy) * 1.3;
+      return 'M' + d.source.x + ',' + d.source.y + 'A' + dr + ',' + dr + ' 0 0,1 ' + d.target.x + ',' + d.target.y;
+    }
+
+    if (simRef) simRef.stop();
+    simRef = d3.forceSimulation(nodes)
+      .force('link',      d3.forceLink(links).id(d => d.id).distance(65))
+      .force('charge',    d3.forceManyBody().strength(-130))
+      .force('center',    d3.forceCenter(W / 2, H / 2))
+      .force('collision', d3.forceCollide(15))
+      .on('tick', () => {
+        link.attr('d', arcPath);
+        nG.attr('transform', d => 'translate(' + (d.x || 0) + ',' + (d.y || 0) + ')');
+      });
+    nG.call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) simRef.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end',   (e, d) => { if (!e.active) simRef.alphaTarget(0); d.fx = null; d.fy = null; }));
+  }
+}
+
+document.getElementById('btn-zi').onclick = () => { if (zB) d3.select('#graph-svg').transition().call(zB.scaleBy, 1.4); };
+document.getElementById('btn-zo').onclick = () => { if (zB) d3.select('#graph-svg').transition().call(zB.scaleBy, .7); };
+document.getElementById('btn-zf').onclick = () => { if (zB) d3.select('#graph-svg').transition().call(zB.transform, d3.zoomIdentity); };
+
+// ── Dossier ───────────────────────────────────────────────────────────────────
+function showRingDossier(ring, members) {
+  const fl = members.filter(m => m.is_flagged).sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0));
+  const cn = members.filter(m => m.label === 1).length;
+  const dc = ring.flag_density > 0.3 ? '#ef4444' : ring.flag_density > 0.05 ? '#f59e0b' : '#94a3b8';
+  document.getElementById('dossier-inner').innerHTML =
+    '<div class="dtitle">Ring #' + ring.ring_rank + ' \xB7 ' + ring.typology.replace(/_/g, ' ') + '</div>' +
+    (ring.flag_density < 0.01 ? '<div class="wbox">\u26A0 Low density (' + (ring.flag_density * 100).toFixed(2) + '%) \u2014 may be incidental co-location in large community</div>' : '') +
+    '<div class="sgrid">' +
+    '<div class="sc"><div class="sv">' + ring.ring_size.toLocaleString() + '</div><div class="sl">Total Nodes</div></div>' +
+    '<div class="sc"><div class="sv" style="color:var(--warn)">' + ring.n_flagged + '</div><div class="sl">Flagged</div></div>' +
+    '<div class="sc"><div class="sv" style="color:' + dc + '">' + (ring.flag_density * 100).toFixed(1) + '%</div><div class="sl">Flag Density</div></div>' +
+    '<div class="sc"><div class="sv" style="color:var(--danger)">' + cn + '</div><div class="sl">Confirmed</div></div>' +
+    '<div class="sc"><div class="sv">' + ring.ring_score.toFixed(4) + '</div><div class="sl">Mean Score</div></div>' +
+    '<div class="sc"><div class="sv">' + fv(ring.total_flow) + '</div><div class="sl">Internal Flow</div></div>' +
+    '</div>' +
+    '<div class="stitle">Flagged Members</div>' +
+    fl.map(m =>
+      '<div class="mi ' + (m.label === 1 ? 'confirmed' : m.is_flagged ? 'flagged' : '') + '" onclick="showAccountDossier(\'' + m.account_id + '\')">' +
+      '<span class="mname" title="' + m.account_id + '">' + m.account_id.split('_').pop() + '</span>' +
+      '<span class="mscore">' + (m.risk_score || 0).toFixed(3) + '</span></div>'
+    ).join('');
+}
+
+function showAccountDossier(aid) {
+  const d = dosMap[aid];
+  if (!d) {
+    document.getElementById('dossier-inner').innerHTML =
+      '<div class="dtitle">Account</div><div class="did">' + aid + '</div>' +
+      '<p style="color:var(--muted);font-size:12px">1-hop neighbour \u2014 no dossier data.</p>';
+    return;
+  }
+  const score = parseFloat(d.risk_score) || 0;
+  const reasons = [d.reason_1, d.reason_2, d.reason_3, d.reason_4, d.reason_5].filter(Boolean);
+  const descs   = [d.reason_1_description, d.reason_2_description, d.reason_3_description].filter(Boolean);
+  document.getElementById('dossier-inner').innerHTML =
+    '<div class="dtitle">Account Dossier</div>' +
+    '<div class="did">' + aid + '</div>' +
+    '<div class="sbar"><div class="sfill" style="width:' + (score * 100).toFixed(1) + '%"></div></div>' +
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Risk score: <strong style="color:var(--accent)">' + score.toFixed(5) + '</strong></div>' +
+    '<div class="stitle">Reason Codes (' + (d.n_reason_codes || reasons.length) + ')</div>' +
+    reasons.map((r, i) => '<span class="rtag" title="' + (descs[i] || '') + '">' + r.replace(/_/g, ' ') + '</span>').join('') +
+    (descs[0] ? '<div style="font-size:11px;color:var(--muted);margin-top:6px">' + descs[0] + '</div>' : '') +
+    '<div class="stitle">Transactions</div>' +
+    '<div class="sgrid">' +
+    '<div class="sc"><div class="sv">' + (parseInt(d.total_out_count) || 0) + '</div><div class="sl">Out Txns</div></div>' +
+    '<div class="sc"><div class="sv">' + (parseInt(d.total_in_count)  || 0) + '</div><div class="sl">In Txns</div></div>' +
+    '<div class="sc"><div class="sv">' + fv(parseFloat(d.total_out_amount) || 0) + '</div><div class="sl">Total Out</div></div>' +
+    '<div class="sc"><div class="sv">' + fv(parseFloat(d.total_in_amount)  || 0) + '</div><div class="sl">Total In</div></div>' +
+    '<div class="sc"><div class="sv">' + (parseInt(d.unique_out_ctpy)  || 0) + '</div><div class="sl">Ctpys</div></div>' +
+    '<div class="sc"><div class="sv">' + (parseInt(d.rapid_event_count)|| 0) + '</div><div class="sl">Rapid Fwd</div></div>' +
+    '</div>' +
+    '<div class="stitle">Dwell Time</div>' +
+    '<div style="font-size:14px;font-weight:700;color:var(--accent2)">' +
+    (parseFloat(d.median_dwell_min) < 99990 ? (parseFloat(d.median_dwell_min) / 60).toFixed(1) + ' hrs median' : 'N/A') + '</div>';
+  drawTLForAccount(aid);
+}
+
+// ── Timeline ──────────────────────────────────────────────────────────────────
+function drawTL(members, cid) {
+  const ids  = members.filter(m => m.is_flagged).map(m => m.account_id);
+  const rows = ids.flatMap(id => evByAcc[id] || []);
+  renderTL(rows, cid, ids.slice(0, 8));
+}
+
+function drawTLForAccount(aid) {
+  renderTL(evByAcc[aid] || [], 'timeline-inner', [aid]);
+  document.querySelectorAll('#right .tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('rt-tl').classList.add('active');
+  document.querySelectorAll('#right .rpanel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-timeline').classList.add('active');
+}
+
+function renderTL(rows, cid, aids) {
+  const wrap = document.getElementById(cid);
+  if (!rows.length) {
+    wrap.innerHTML = '<div style="padding:30px 16px;text-align:center;color:var(--muted);font-size:12px">No evidence data for this selection.</div>';
+    return;
+  }
+  const uid = cid.replace(/[^a-z]/g, '');
+  wrap.innerHTML = '<div style="padding:12px 14px"><div class="chart-title">Evidence Timeline</div>' +
+    '<svg id="tl_' + uid + '" style="width:100%;display:block"></svg></div>';
+  const pts = rows.map(e => ({ ...e, ts: new Date(e.timestamp), amt: parseFloat(e.amount) || 0 }))
+                  .filter(e => !isNaN(e.ts)).sort((a, b) => a.ts - b.ts);
+  if (!pts.length) return;
+  const pal = ['#6366f1','#22d3ee','#f59e0b','#ef4444','#22c55e','#a78bfa','#fb923c','#38bdf8'];
+  const clr = {}; aids.forEach((id, i) => clr[id] = pal[i % pal.length]);
+  const W = Math.max(200, (wrap.clientWidth || 280) - 28);
+  const H = 165, mt = 8, mb = 36, ml = 36, mr = 8;
+  const iW = W - ml - mr, iH = H - mt - mb;
+  const xS = d3.scaleTime().domain(d3.extent(pts, d => d.ts)).range([0, iW]);
+  const yS = d3.scaleLinear().domain([0, d3.max(pts, d => d.amt)]).range([iH, 0]);
+  const svg = d3.select('#tl_' + uid).attr('viewBox', '0 0 ' + W + ' ' + H).attr('height', H);
+  const g   = svg.append('g').attr('transform', 'translate(' + ml + ',' + mt + ')');
+  g.append('g').call(d3.axisLeft(yS).ticks(4).tickSize(-iW).tickFormat(''))
+    .selectAll('line').attr('stroke', 'var(--border)').attr('stroke-dasharray', '3,3');
+  g.select('.domain').remove();
+  aids.forEach(id => {
+    const p = pts.filter(e => e.account_id === id);
+    if (p.length > 1)
+      g.append('path').datum(p).attr('fill', 'none')
+        .attr('stroke', clr[id] || '#6366f1').attr('stroke-width', 1.2).attr('opacity', .4)
+        .attr('d', d3.line().x(d => xS(d.ts)).y(d => yS(d.amt)));
+    g.selectAll(null).data(p).enter().append('circle')
+      .attr('cx', d => xS(d.ts)).attr('cy', d => yS(d.amt))
+      .attr('r', 3.5).attr('fill', clr[id] || '#6366f1').attr('opacity', .9)
+      .append('title').text(d => id.split('_').pop() + '\n' + d.ts.toISOString().slice(0, 16) + '\n' + fv(d.amt) + ' (' + (d.role||'') + ')');
+  });
+  g.append('g').attr('transform', 'translate(0,' + iH + ')')
+    .call(d3.axisBottom(xS).ticks(4).tickSize(2))
+    .selectAll('text').attr('fill', 'var(--muted)').attr('font-size', 8)
+    .attr('transform', 'rotate(-20)').attr('text-anchor', 'end');
+  g.append('g').call(d3.axisLeft(yS).ticks(4).tickSize(2).tickFormat(d => fv(d)))
+    .selectAll('text').attr('fill', 'var(--muted)').attr('font-size', 8);
+  g.selectAll('.domain,.tick line').attr('stroke', 'var(--border)');
+  // per-account colour dots
+  if (aids.length > 1) {
+    aids.slice(0, 6).forEach((id, i) => {
+      const lx = ml + i * (iW / Math.min(aids.length, 6));
+      svg.append('circle').attr('cx', lx).attr('cy', H - 5).attr('r', 3).attr('fill', clr[id] || '#6366f1');
+      svg.append('text').attr('x', lx + 6).attr('y', H - 2).attr('font-size', 7.5)
+        .attr('fill', 'var(--muted)').text(id.split('_').pop().slice(-6));
+    });
+  }
+}
+
+// ── Fullscreen Modal ──────────────────────────────────────────────────────────
+document.getElementById('btn-exp').onclick = () => {
+  if (!curRing) return;
+  document.getElementById('mtitle').textContent =
+    'Ring #' + curRing.ring_rank + ' \xB7 ' + curRing.typology + ' \xB7 ' + curRing.ring_size + ' nodes';
+  document.getElementById('modal').classList.add('open');
+  const mems = memByRing[curRing.ring_id] || [];
+  const eds  = edgeByCid[curRing.community_id] || [];
+  setTimeout(() => {
+    if (eds.length > 0) {
+      drawGraph(mems, eds, 'mgsvg', true);
+      document.getElementById('mgleg').style.display = 'block';
+    } else {
+      document.getElementById('mgsvg').innerHTML =
+        '<text x="50%" y="50%" text-anchor="middle" fill="var(--muted)" font-size="13">No edge data for this ring.</text>';
+    }
+    drawTL(mems, 'mtl-inner');
+    const fl = mems.filter(m => m.is_flagged).sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0));
+    document.getElementById('mmem-list').innerHTML = fl.map(m =>
+      '<div class="mi ' + (m.label === 1 ? 'confirmed' : m.is_flagged ? 'flagged' : '') + '" onclick="showAccountDossier(\'' + m.account_id + '\');closeModal();">' +
+      '<span class="mname" title="' + m.account_id + '">' + m.account_id.split('_').pop() + '</span>' +
+      '<span class="mscore">' + (m.risk_score || 0).toFixed(3) + '</span></div>'
+    ).join('');
+  }, 60);
+};
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+document.getElementById('mclose').onclick = closeModal;
+document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
+
+// ── Account Search ────────────────────────────────────────────────────────────
+const si = document.getElementById('search');
+const sr = document.getElementById('search-results');
+si.addEventListener('input', () => {
+  const q = si.value.trim().toLowerCase();
+  if (q.length < 3) { sr.style.display = 'none'; return; }
+  const hits = DOS.filter(d => d.account_id && d.account_id.toLowerCase().includes(q)).slice(0, 8);
+  if (!hits.length) { sr.style.display = 'none'; return; }
+  sr.innerHTML = hits.map(h =>
+    '<div class="sr-item" data-id="' + h.account_id + '">' +
+    '<div>' + h.account_id + '</div>' +
+    '<div class="sr-label">Score: ' + parseFloat(h.risk_score).toFixed(4) + '</div></div>'
+  ).join('');
+  sr.style.display = 'block';
+  sr.querySelectorAll('.sr-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.dataset.id;
+      si.value = id; sr.style.display = 'none';
+      const mem = MEMBERS.find(m => m.account_id === id);
+      if (mem) selectRing(mem.ring_id);
+      showAccountDossier(id);
+    });
+  });
+});
+document.addEventListener('click', e => { if (!e.target.closest('#search-wrap')) sr.style.display = 'none'; });
+</script>
+</body>
+</html>

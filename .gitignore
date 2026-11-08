@@ -1,0 +1,58 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Environments ──────────────────────────────────────────────────────────────
+venv/
+venv_cuda/
+.venv/
+env/
+ENV/
+
+# ── Data (too large for git — use Kaggle or DVC) ──────────────────────────────
+data/raw/
+data/processed/
+*.csv
+*.parquet
+*.pkl
+*.joblib
+*.pt
+*.pth
+*.onnx
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+outputs/
+outputs_*/
+
+# ── Dashboard build artefacts ─────────────────────────────────────────────────
+# Keep the template; ignore the generated HTML (contains embedded data)
+outputs/dashboard/mulenet_dashboard.html
+
+# ── Notebooks ─────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+# Uncomment to ignore notebooks entirely:
+# *.ipynb
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Credentials ───────────────────────────────────────────────────────────────
+kaggle.json
+*.json
+# Re-include non-sensitive JSON
+!dashboard/_dash_template.html

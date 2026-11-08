@@ -1,0 +1,34 @@
+# MuleNet AI v2.9.2 — consolidated requirements
+# Install into a fresh virtual environment before installing PyTorch.
+# PyTorch is NOT listed here — install it separately per platform/CUDA build.
+# See: https://pytorch.org/get-started/locally/
+#
+# CPU-only quick start (no GPU needed for training, just slower):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+#
+# CUDA quick start (replace cu121 with your CUDA version):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements.txt
+
+# ── Core data ──────────────────────────────────────────────────────────────
+pandas>=2.0
+numpy>=1.24
+pyarrow>=12.0           # parquet I/O (predictions file)
+python-dateutil>=2.9.0
+
+# ── ML ─────────────────────────────────────────────────────────────────────
+scikit-learn>=1.3
+joblib>=1.3
+scipy>=1.10             # sparse adjacency for GraphSAGE experiment
+
+# ── Graph ──────────────────────────────────────────────────────────────────
+networkx>=3.2           # Louvain community detection (rings module)
+
+# ── Optional experiments ───────────────────────────────────────────────────
+# Uncomment to enable --experiment-lightgbm:
+# lightgbm>=4.0
+
+# ── Optional: faster Louvain (python-louvain package) ─────────────────────
+# Falls back to networkx.community.louvain_communities if not installed.
+# python-louvain>=0.16
