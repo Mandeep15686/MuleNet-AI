@@ -200,14 +200,38 @@ def rapid_forward_features(
 
     window = pd.Timedelta(minutes=window_min)
 
-    # Cross-merge on account + currency, then filter time window
-    merged = in_tx.merge(out_tx, on=["account_id", "cur"], how="inner")
-    merged = merged[
-        (merged["ts_out"] > merged["ts_in"]) &
-        (merged["ts_out"] <= merged["ts_in"] + window)
-    ]
+    # Use sorted timestamps and prefix sums instead of a many-to-many merge.
+    # A busy account/currency pair can otherwise create hundreds of millions
+    # of intermediate rows before the time-window filter is applied.
+    out_groups = {
+        key: group.sort_values("ts_out")
+        for key, group in out_tx.groupby(["account_id", "cur"], sort=False, observed=True)
+    }
+    event_frames = []
+    window_ns = window.value
+    for key, incoming in in_tx.groupby(["account_id", "cur"], sort=False, observed=True):
+        outgoing = out_groups.get(key)
+        if outgoing is None or outgoing.empty:
+            continue
+        incoming = incoming.sort_values("ts_in")
+        out_times = outgoing["ts_out"].to_numpy(dtype="datetime64[ns]").astype("int64")
+        out_amounts = outgoing["amt_out"].to_numpy(dtype="float64")
+        prefix = np.concatenate(([0.0], np.cumsum(out_amounts, dtype="float64")))
+        in_times = incoming["ts_in"].to_numpy(dtype="datetime64[ns]").astype("int64")
+        # right-sided bounds exclude outputs at the same instant and include
+        # outputs exactly at the end of the requested window.
+        lo = np.searchsorted(out_times, in_times, side="right")
+        hi = np.searchsorted(out_times, in_times + window_ns, side="right")
+        counts = hi - lo
+        selected = counts > 0
+        if not selected.any():
+            continue
+        block = incoming.loc[selected, ["account_id", "ts_in", "amt_in", "cur"]].copy()
+        block["forwarded_amount"] = prefix[hi[selected]] - prefix[lo[selected]]
+        block["n_out_events"] = counts[selected]
+        event_frames.append(block)
 
-    if merged.empty:
+    if not event_frames:
         empty_ev  = pd.DataFrame(columns=["account_id","in_timestamp","in_amount",
                                            "in_currency","forwarded_amount",
                                            "forward_ratio","n_out_events"])
@@ -217,10 +241,8 @@ def rapid_forward_features(
                                            "rapid_forward_ratio_mean"])
         return empty_sum, empty_ev
 
-    # Aggregate per incoming event
-    ev = (merged.groupby(["account_id", "ts_in", "amt_in", "cur"], observed=True)
-                .agg(forwarded_amount=("amt_out","sum"), n_out_events=("amt_out","count"))
-                .reset_index())
+    # Each incoming event already has its window aggregate.
+    ev = pd.concat(event_frames, ignore_index=True)
     ev["forward_ratio"] = ev["forwarded_amount"] / ev["amt_in"].clip(lower=1e-9)
     ev = ev.rename(columns={"ts_in":"in_timestamp","amt_in":"in_amount","cur":"in_currency"})
 
