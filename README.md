@@ -166,9 +166,9 @@ mulenet-ai/
 ### Step 1: Clone the Repository
 
 ```powershell
-git clone https://github.com/<your-username>/mulenet-ai.git
+git clone https://github.com/Mandeep15686/MuleNet-AI
 
-cd mulenet-ai
+cd MuleNet-AI
 ```
 
 ### Step 2: Create Virtual Environment
